@@ -148,6 +148,19 @@ final class TrackerTest extends TestCase
         $this->assertStringContainsString('is not JSON', $tracker->statusText());
     }
 
+    public function testTheTimeIsTheMachinesNotPhpsDefault(): void
+    {
+        $this->assertSame('Asia/Singapore', Tracker::localTimezone('Asia/Singapore', null));
+        $this->assertSame('Asia/Singapore', Tracker::localTimezone(':Asia/Singapore', null));
+
+        $link = "{$this->dir}/localtime";
+        symlink('/var/db/timezone/zoneinfo/Asia/Singapore', $link);
+        $this->assertSame('Asia/Singapore', Tracker::localTimezone('', $link));
+        $this->assertSame('Asia/Singapore', Tracker::localTimezone('Not/AZone', $link));
+
+        $this->assertSame(date_default_timezone_get(), Tracker::localTimezone('', null));
+    }
+
     private function tracker(FakeTransport $http): Tracker
     {
         $tracker = new Tracker(new UsageClient($http));

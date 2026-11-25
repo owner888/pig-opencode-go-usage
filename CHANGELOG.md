@@ -4,6 +4,13 @@ What changed, newest first, in pig's format: `## Unreleased` while working, `## 
 at release. The version lives in the git tag only, and follows the pi-opencode-go-usage release the
 port is in step with.
 
+## Unreleased
+
+### Fixed
+
+- The "update" time is in the machine's time zone (`TZ`, else the zone `/etc/localtime` names), as upstream's is; it was PHP's default, which is UTC on a PHP with no `date.timezone`.
+- The status line is drawn in the theme's `dim`, as the footer's own lines are, instead of as the one bright line there. In the terminal only; an RPC host still gets it plain.
+
 ## [1.1.3] - 2026-11-26
 
 In step with pi-opencode-go-usage 1.1.3. The first release.

@@ -403,10 +403,39 @@ final class Tracker
         return $days === null ? null : Format::formatDaysLeft($days);
     }
 
-    /** `update 2:32 PM (Asia/Singapore)`. */
+    /** `update 2:32 PM (Asia/Singapore)`, in the machine's time zone, as upstream's `toLocaleTimeString()` is. */
     private function updatedAt(): string
     {
-        return 'update ' . date('g:i A', (int) ($this->lastFetchedAt / 1000)) . ' (' . date_default_timezone_get() . ')';
+        $zone = new \DateTimeZone(self::localTimezone());
+        $at = (new \DateTimeImmutable('@' . (int) ($this->lastFetchedAt / 1000)))->setTimezone($zone);
+
+        return 'update ' . $at->format('g:i A') . ' (' . $zone->getName() . ')';
+    }
+
+    /**
+     * The machine's time zone: `TZ`, else the zone `/etc/localtime` links to (macOS and most Linux),
+     * else PHP's own. PHP's own alone is not it: without `date.timezone` in php.ini it is UTC, which
+     * is where the developer, in Singapore, first saw `update 9:10 PM (UTC)`.
+     */
+    public static function localTimezone(?string $tz = null, ?string $localtime = '/etc/localtime'): string
+    {
+        $known = static fn (string $name): bool => in_array($name, \DateTimeZone::listIdentifiers(), true);
+        // POSIX allows `TZ=:Asia/Singapore`.
+        $tz = ltrim($tz ?? (string) getenv('TZ'), ':');
+
+        if ($tz !== '' && $known($tz)) {
+            return $tz;
+        }
+
+        if ($localtime !== null && is_link($localtime)) {
+            $target = readlink($localtime);
+
+            if ($target !== false && preg_match('#zoneinfo/(.+)$#', $target, $match) === 1 && $known($match[1])) {
+                return $match[1];
+            }
+        }
+
+        return date_default_timezone_get();
     }
 
     private function nowMs(): float

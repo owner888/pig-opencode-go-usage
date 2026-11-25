@@ -69,7 +69,7 @@ return function (ExtensionApi $pig): void {
             return;
         }
 
-        $screen = Screen::of($ctx->ui);
+        $screen = Screen::of($ctx->ui, dim: true);
 
         if ($tracker->apiKey() !== null || $tracker->credentials() !== null) {
             $screen->notify('OpenCode Go usage tracker loaded');
@@ -90,7 +90,7 @@ return function (ExtensionApi $pig): void {
     $pig->registerCommand(
         Tracker::KEY,
         static function (string $args, ExtensionContext $ctx) use ($tracker): void {
-            $tracker->command($args, Screen::of($ctx->ui));
+            $tracker->command($args, Screen::of($ctx->ui, dim: $ctx->hasUi && $ctx->mode() === 'tui'));
         },
         Tracker::COMMAND_DESCRIPTION,
     );

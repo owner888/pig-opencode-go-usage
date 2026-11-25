@@ -25,10 +25,16 @@ final readonly class Screen
     ) {
     }
 
-    public static function of(ExtensionUi $ui): self
+    /**
+     * @param bool $dim the status line in the theme's `dim`, as the footer's own lines are — in the
+     *        terminal only. The footer draws an extension's status as given (upstream's rule: the
+     *        extension colours it), and plain it was the one bright line there. An RPC host or a page
+     *        would get the escape codes as text, so they get it plain.
+     */
+    public static function of(ExtensionUi $ui, bool $dim = false): self
     {
         return new self(
-            static fn (string $key, ?string $text) => $ui->setStatus($key, $text),
+            static fn (string $key, ?string $text) => $ui->setStatus($key, $dim && $text !== null ? $ui->theme()->fg('dim', $text) : $text),
             static fn (string $key, ?array $lines) => $ui->setWidget($key, $lines, ['placement' => 'above']),
             static fn (string $message, string $level) => $ui->notify($message, $level),
         );

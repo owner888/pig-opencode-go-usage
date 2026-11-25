@@ -10,6 +10,7 @@ use Pig\Ai\Http\HttpTransport;
 use Pig\Ai\Http\Request;
 use Pig\Ai\Http\Response;
 use Pig\Ai\Http\Retrying;
+use Pig\Ai\Utils\PigUserAgent;
 use Pig\Async\AbortError;
 use Throwable;
 
@@ -20,7 +21,10 @@ use Throwable;
  *
  * Where this is pig's: the request goes through `Retrying::fetch()` (pig's rule for a plain HTTP
  * request), so a dropped connection or a 5xx is asked again before it becomes a failure; upstream
- * sends once. Upstream's aliases (`parseUsage`, `fetchGoUsage`, …) and its overloaded
+ * sends once. And the API-key request says it is pig (`PigUserAgent`, `pig/<version> (…)`), the
+ * same `User-Agent` pig's model requests to OpenCode carry, as the developer asked: upstream sends a
+ * Chrome one for both, and one key should not show up as two clients. The console-cookie request
+ * keeps the browser's, because it stands in for the browser's session. Upstream's aliases (`parseUsage`, `fetchGoUsage`, …) and its overloaded
  * `fetchUsage(apiKeyOrWorkspace, cookieOrOrigin)` are not here: two methods say which is which.
  */
 final class UsageClient
@@ -32,7 +36,8 @@ final class UsageClient
 
     public const float REQUEST_TIMEOUT = 20.0;
 
-    public const string USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+    /** The console-cookie request's `User-Agent`: the browser whose session it borrows. */
+    public const string BROWSER_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
     /** Upstream's `WINDOW_KEYS`: the legacy console's meters; the month falls back to the period end. */
     private const array WINDOW_KEYS = [
@@ -130,7 +135,10 @@ final class UsageClient
             throw FetchFailure::of(FetchFailure::NO_CREDENTIALS);
         }
 
-        [$response, $body] = $this->get('/zen/go/v1/usage', ['Authorization' => 'Bearer ' . trim($apiKey)]);
+        [$response, $body] = $this->get('/zen/go/v1/usage', [
+            'Authorization' => 'Bearer ' . trim($apiKey),
+            'User-Agent' => PigUserAgent::get(),
+        ]);
         self::judge($response);
         $payload = self::decode($body);
 
@@ -157,6 +165,7 @@ final class UsageClient
         [$response, $body] = $this->get('/console/api/go/status', [
             'Cookie' => self::cookieHeader($authCookie),
             'x-org-id' => trim($workspaceId),
+            'User-Agent' => self::BROWSER_USER_AGENT,
         ]);
         self::judge($response);
         $payload = self::decode($body);
@@ -185,7 +194,6 @@ final class UsageClient
     {
         $request = new Request('GET', rtrim($this->origin, '/') . $path, [
             ...$headers,
-            'User-Agent' => self::USER_AGENT,
             'Accept' => 'application/json',
         ]);
 

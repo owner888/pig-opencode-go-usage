@@ -6,6 +6,10 @@ port is in step with.
 
 ## Unreleased
 
+### Changed
+
+- The usage request made with an API key says it is pig (`pig/<version> (…)`), the `User-Agent` pig's model requests to OpenCode carry, instead of upstream's Chrome one, so one key does not show up as two clients. The console-cookie request still sends the browser's, since it uses the browser's session.
+
 ### Fixed
 
 - The "update" time is in the machine's time zone (`TZ`, else the zone `/etc/localtime` names), as upstream's is; it was PHP's default, which is UTC on a PHP with no `date.timezone`.

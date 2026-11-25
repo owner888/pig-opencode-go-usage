@@ -32,6 +32,8 @@ does; this says how it is worked on. Keep this file under 100 lines.
   what is left, as the page draws every quota; the text says what is used.
 - **Requests** go through `Pig\Ai\Http\Retrying::fetch()` with `send()`, never `follow()`: a
   redirect is judged, as upstream's `redirect: "manual"` is.
+- **User-Agent**: the API-key request sends `PigUserAgent::get()`, as pig's model requests to
+  OpenCode do; upstream sends a Chrome one. The console-cookie request keeps the browser's.
 - Upstream's aliases (`parseUsage`, `fetchGoUsage`, …) and its overloaded `fetchUsage()` are not
   ported: `fetchWithApiKey()` and `fetchWithCookie()` say which is which.
 

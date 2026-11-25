@@ -105,6 +105,8 @@ final class UsageClientTest extends TestCase
         $this->assertSame('https://opencode.ai/console/api/go/status', $http->requests[0]->url);
         $this->assertSame('wrk_01TEST', $http->requests[0]->headers['x-org-id']);
         $this->assertSame('__Host-console_session=Fe26.2**opaque', $http->requests[0]->headers['Cookie']);
+        // The browser's session, sent as the browser.
+        $this->assertSame(UsageClient::BROWSER_USER_AGENT, $http->requests[0]->headers['User-Agent']);
         $this->assertSame([62.0, 31.0, 44.0], array_map(static fn (UsageMeter $m) => $m->percent, $meters));
     }
 
@@ -116,6 +118,9 @@ final class UsageClientTest extends TestCase
         $this->assertSame('https://opencode.ai/zen/go/v1/usage', $http->requests[0]->url);
         $this->assertSame('Bearer sk-test', $http->requests[0]->headers['Authorization']);
         $this->assertSame('GET', $http->requests[0]->method);
+        // pig's own, as its model requests to OpenCode say, not upstream's Chrome.
+        $this->assertSame(\Pig\Ai\Utils\PigUserAgent::get(), $http->requests[0]->headers['User-Agent']);
+        $this->assertStringStartsWith('pig', $http->requests[0]->headers['User-Agent']);
         $this->assertEquals([new UsageMeter(MeterKind::FiveHour, 10.0, '2026-09-19T15:00:00.000Z')], $meters);
     }
 

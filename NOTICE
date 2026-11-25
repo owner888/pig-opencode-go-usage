@@ -1,0 +1,12 @@
+pig-opencode-go-usage
+Copyright 2026 owner888
+
+This package is a PHP port of pi-opencode-go-usage
+(https://github.com/Dakai/pi-opencode-go-usage), Copyright (c) 2026
+pi-opencode-go-usage contributors, MIT License: the usage endpoints and how
+their answers are read, the status line, the /opencode-go report and its
+subcommands, the saved file and the monthly pace estimate follow that project
+and are kept in step with its releases.
+
+The HTTP client and the extension API are pig's own
+(https://github.com/owner888/pig), MIT License.

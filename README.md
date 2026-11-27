@@ -10,9 +10,9 @@ Footer:  OpenCode Go: 5h 38% · wk 69% · mo 56%
 /usage opencode-go:
   OpenCode Go
 
-    [████████------------] Rolling 5h: 38% left · resets 1h 12m
-    [██████████████------] Weekly: 69% left · resets 3d 4h
-    [███████████---------] Monthly: 56% left · resets 12d 0h · ~15d left
+    [████████------------] 5-hour limit: 38% left · resets 1h 12m
+    [██████████████------] Weekly limit: 69% left · resets 3d 4h
+    [███████████---------] Monthly limit: 56% left · resets 12d 0h · lasts ~15d at this pace
 ```
 
 Every bar is what is left, coloured by it. The monthly line ends with an estimate: at the pace so far, the quota lasts about 15 more days.

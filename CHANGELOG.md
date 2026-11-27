@@ -9,6 +9,7 @@ port is in step with.
 ### Changed
 
 - pig draws the usage now (`registerUsage()`, pig's new usage API): the footer line, `/usage` and the Usage panel in `pig web` are pig's, in the look every plan shares — each bar is what is *left*, coloured by it — and `/opencode-go` shows the same report. The package's own status line, report widget, timer and web panel are gone, and so is `--compact`, which the footer's line already is. Needs a pig with `registerUsage()`.
+- The windows are named and the monthly estimate worded by pig, in the page's language and the same for every provider (`5-hour limit`, `Weekly limit`, `Monthly limit`; `lasts ~15d at this pace`): the report passes the estimate as days (`UsageMeter::$daysLeft`), and upstream's `formatDaysLeft()` is not ported.
 - The usage request made with an API key says it is pig (`pig/<version> (…)`), the `User-Agent` pig's model requests to OpenCode carry, instead of upstream's Chrome one, so one key does not show up as two clients. The console-cookie request still sends the browser's, since it uses the browser's session.
 
 ## [1.1.3] - 2026-11-26

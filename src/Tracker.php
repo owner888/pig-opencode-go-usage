@@ -209,7 +209,7 @@ final class Tracker
             (100 - $meter->percent) / 100,
             $meter->resetsAt === null ? null : new DateTimeImmutable($meter->resetsAt),
             $meter->kind->short(),
-            $this->monthEta($meter),
+            daysLeft: $this->monthDaysLeft($meter),
         ), $this->meters))]);
     }
 
@@ -340,16 +340,17 @@ final class Tracker
         }
     }
 
-    /** Monthly only: quota days left at the current pace, e.g. `~18d left`. */
-    private function monthEta(UsageMeter $meter): ?string
+    /**
+     * Monthly only: the days what is left lasts at the pace so far — upstream's estimate; pig words
+     * it, in the page's language.
+     */
+    private function monthDaysLeft(UsageMeter $meter): ?float
     {
         if ($meter->kind !== MeterKind::ProductPeriod || $this->config->showEstimate === false) {
             return null;
         }
 
-        $days = Format::daysLeftEstimate($meter->percent, $meter->resetsAt, $this->nowMs());
-
-        return $days === null ? null : Format::formatDaysLeft($days);
+        return Format::daysLeftEstimate($meter->percent, $meter->resetsAt, $this->nowMs());
     }
 
     private function nowMs(): float

@@ -34,11 +34,4 @@ final class FormatTest extends TestCase
         // Fully used up.
         $this->assertSame(0.0, Format::daysLeftEstimate(100, $end, $now));
     }
-
-    public function testFormatDaysLeftStaysShort(): void
-    {
-        $this->assertSame('~18d left', Format::formatDaysLeft(18.4));
-        $this->assertSame('<1d left', Format::formatDaysLeft(0.4));
-        $this->assertSame('quota used up', Format::formatDaysLeft(0));
-    }
 }

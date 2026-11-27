@@ -10,9 +10,9 @@
 /usage opencode-go：
   OpenCode Go
 
-    [████████------------] Rolling 5h: 38% left · resets 1h 12m
-    [██████████████------] Weekly: 69% left · resets 3d 4h
-    [███████████---------] Monthly: 56% left · resets 12d 0h · ~15d left
+    [████████------------] 5-hour limit: 38% left · resets 1h 12m
+    [██████████████------] Weekly limit: 69% left · resets 3d 4h
+    [███████████---------] Monthly limit: 56% left · resets 12d 0h · lasts ~15d at this pace
 ```
 
 每根条显示的是剩余额度，颜色也按剩余多少来定。月度那行最后是估算：按目前的用量速度，额度大约还够用 15 天。

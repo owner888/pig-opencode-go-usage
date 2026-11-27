@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace PigOpencodeGoUsage;
 
 /**
- * Upstream's `daysLeftEstimate()` and `formatDaysLeft()`, the monthly pace estimate. Its `bar()` and
- * `countdown()` are not ported: pig draws the bars and the resets (`UsageView`).
+ * Upstream's `daysLeftEstimate()`, the monthly pace estimate. Its `bar()`, `countdown()` and
+ * `formatDaysLeft()` are not ported: pig draws the bars, the resets and the estimate's words
+ * (`UsageView`), in the page's language.
  */
 final class Format
 {
@@ -51,16 +52,6 @@ final class Format
         }
 
         return (100 - $percent) * $elapsedDays / $percent;
-    }
-
-    /** `~18d left` / `<1d left` / `quota used up` — short enough for a status bar. */
-    public static function formatDaysLeft(float $days): string
-    {
-        if ($days <= 0) {
-            return 'quota used up';
-        }
-
-        return $days < 1 ? '<1d left' : '~' . (int) round($days) . 'd left';
     }
 
     public static function nowMs(): float

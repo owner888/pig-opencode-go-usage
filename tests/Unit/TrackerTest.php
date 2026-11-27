@@ -57,15 +57,15 @@ final class TrackerTest extends TestCase
         $this->assertSame(['Rolling 5h', 'Weekly', 'Monthly'], array_map(static fn (UsageMeter $m): string => $m->label, $meters));
         $this->assertSame([0.9, 0.8, 0.5], array_map(static fn (UsageMeter $m): float => $m->remaining, $meters));
         $this->assertSame(['5h', 'wk', 'mo'], array_map(static fn (UsageMeter $m): ?string => $m->short, $meters));
-        // Only the monthly meter is extrapolated.
-        $this->assertNull($meters[1]->detail);
-        $this->assertMatchesRegularExpression('/^~\d+d left$/', (string) $meters[2]->detail);
+        // Only the monthly meter is extrapolated, as days for pig to word.
+        $this->assertNull($meters[1]->daysLeft);
+        $this->assertEqualsWithDelta(15.0, (float) $meters[2]->daysLeft, 0.1);
         $this->assertSame('OpenCode Go: 5h 90% · wk 80% · mo 50%', UsageView::statusLine(Tracker::TITLE, $report));
 
         $this->command($tracker, '--estimate off');
         $this->assertFalse(json_decode((string) file_get_contents("{$this->dir}/opencode-go-usage.json"), true)['showEstimate']);
         $report = Async::run(static fn (): UsageReport => $tracker->report());
-        $this->assertNull($report->groups[0]->meters[2]->detail);
+        $this->assertNull($report->groups[0]->meters[2]->daysLeft);
     }
 
     public function testWithoutCredentialsTheReportSaysNotConnected(): void
@@ -142,7 +142,7 @@ final class TrackerTest extends TestCase
         $this->command($tracker, '--connect wrk_01 Fe26.2**opaque');
 
         $this->assertSame('wrk_01', $http->requests[0]->headers['x-org-id']);
-        $this->assertStringContainsString('Weekly: 75% left', implode("\n", array_column($this->notices, 0)));
+        $this->assertStringContainsString('Weekly limit: 75% left', implode("\n", array_column($this->notices, 0)));
 
         $this->command($tracker, '--disconnect');
         $this->assertSame(Tracker::NOT_CONNECTED, Async::run(static fn (): UsageReport => $tracker->report())->note);

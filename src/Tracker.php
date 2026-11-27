@@ -5,17 +5,25 @@ declare(strict_types=1);
 namespace PigOpencodeGoUsage;
 
 use Closure;
+use DateTimeImmutable;
 use Pig\CodingAgent\Config;
+use Pig\CodingAgent\Usage\UsageGroup;
+use Pig\CodingAgent\Usage\UsageMeter as Meter;
+use Pig\CodingAgent\Usage\UsageReport;
+use Pig\CodingAgent\Usage\UsageView;
 use RuntimeException;
 use Throwable;
 
 /**
- * The body of upstream's `opencodeGoUsage()` factory: which credentials win, the status line, the
- * report widget, a refresh, and `/opencode-go` with its subcommands. The extension's entry wires it
- * to pig's hooks and its timer.
+ * The body of upstream's `opencodeGoUsage()` factory: which credentials win, a refresh, and
+ * `/opencode-go` with its subcommands. The extension's entry registers `report()` with pig.
  *
  * Where this is pig's:
  *
+ * - **pig draws it** (`registerUsage()`, the developer's choice): the footer line, `/usage`, the
+ *   web panel and `/opencode-go`'s report all come from `report()` through pig's `UsageView`, so
+ *   OpenCode Go looks like every other plan — bars of what is *left*, where upstream shows what is
+ *   used, with its own status line, report widget, timer and `--compact`. Those are not ported.
  * - **The key pig already has counts.** After upstream's `OPENCODE_GO_API_KEY`, `OPENCODE_API_KEY`,
  *   `OPENCODE_ZEN_API_KEY` and the saved key come pig's own sign-ins for `opencode-go` and then
  *   `opencode` (`/login`, or `auth.json`): somebody who uses OpenCode Go in pig has nothing to set up.
@@ -26,15 +34,17 @@ final class Tracker
 {
     public const string KEY = 'opencode-go';
 
-    public const int REFRESH_SECONDS = 300;
-
     /** The variables an API key is read from, first non-empty wins. */
     public const array API_KEY_VARIABLES = ['OPENCODE_GO_API_KEY', 'OPENCODE_API_KEY', 'OPENCODE_ZEN_API_KEY'];
 
     /** pig's providers whose sign-in is an OpenCode API key, in the order they are asked. */
     public const array PROVIDERS = ['opencode-go', 'opencode'];
 
-    public const string COMMAND_DESCRIPTION = 'Show OpenCode Go usage. Subcommands: --connect <api-key> | --connect <wrk> <cookie> | --api-key <key> | --workspace <id> | --cookie <v> | --disconnect | --refresh | --compact [on|off] | --estimate [on|off] | --json';
+    public const string TITLE = 'OpenCode Go';
+
+    public const string NOT_CONNECTED = 'Not connected. Run /login and choose OpenCode Go, or /opencode-go --connect <api-key> (or <wrk_…> <console-cookie>).';
+
+    public const string COMMAND_DESCRIPTION = 'Show OpenCode Go usage. Subcommands: --connect <api-key> | --connect <wrk> <cookie> | --api-key <key> | --workspace <id> | --cookie <v> | --disconnect | --refresh | --estimate [on|off] | --json';
 
     private SavedConfig $config;
 
@@ -148,7 +158,7 @@ final class Tracker
     }
 
     /** Fetch the meters, with the API key when there is one, else the console cookie. */
-    public function refresh(?Screen $screen = null): void
+    public function refresh(): void
     {
         $apiKey = $this->apiKey();
         $credentials = $this->credentials();
@@ -156,7 +166,6 @@ final class Tracker
         if ($apiKey === null && $credentials === null) {
             $this->meters = [];
             $this->lastError = null;
-            $screen?->status(self::KEY, $this->statusText());
 
             return;
         }
@@ -171,84 +180,37 @@ final class Tracker
             $this->meters = [];
             $this->lastError = $failure->describe();
         }
-
-        $screen?->status(self::KEY, $this->statusText());
     }
 
-    public function statusText(): string
+    /**
+     * What pig draws: the saved file read again (pig's web server outlives any one session), a
+     * fresh fetch, and each window as what is left. A failure is thrown, so pig says it as one.
+     */
+    public function report(): UsageReport
     {
+        $this->loadConfig();
+
         if ($this->configError !== null) {
-            return "OpenCode Go: {$this->configError}";
+            throw new RuntimeException($this->configError);
         }
 
         if ($this->apiKey() === null && $this->credentials() === null) {
-            return 'OpenCode Go: not connected (/opencode-go --connect)';
+            return UsageReport::note(self::NOT_CONNECTED);
         }
+
+        $this->refresh();
 
         if ($this->lastError !== null) {
-            return "OpenCode Go: {$this->lastError}";
+            throw new RuntimeException($this->lastError);
         }
 
-        if ($this->meters === []) {
-            return 'OpenCode Go: loading…';
-        }
-
-        $parts = array_map(function (UsageMeter $meter): string {
-            $head = $meter->kind->short() . ' ' . Format::percent($meter->percent) . '%';
-
-            if ($this->config->compact === true) {
-                return $head;
-            }
-
-            $detail = $this->detail($meter);
-
-            return $detail !== '' ? "{$head} ({$detail})" : $head;
-        }, $this->meters);
-        $text = 'OpenCode Go: ' . implode(' · ', $parts);
-
-        if ($this->config->compact !== true && $this->lastFetchedAt > 0) {
-            $text .= ' · ' . $this->updatedAt();
-        }
-
-        return $text;
-    }
-
-    /** @return list<string> */
-    public function reportLines(): array
-    {
-        $credentials = $this->credentials();
-        $lines = ['OpenCode Go Usage'];
-
-        if ($this->configError !== null) {
-            $lines[] = "Error: {$this->configError}";
-        }
-
-        if ($credentials === null && $this->apiKey() === null) {
-            $lines[] = 'Not connected.';
-            $lines[] = 'Run /opencode-go --connect <api-key> (or <wrk_…> <console-cookie>), or /login OpenCode Go';
-            $lines[] = 'Or set OPENCODE_GO_API_KEY / OPENCODE_GO_WORKSPACE_ID + OPENCODE_GO_AUTH_COOKIE';
-
-            return $lines;
-        }
-
-        $lines[] = $credentials !== null ? "Workspace: {$credentials['workspaceId']}" : 'API key: connected';
-
-        if ($this->lastError !== null) {
-            $lines[] = "Error: {$this->lastError}";
-        } elseif ($this->meters === []) {
-            $lines[] = 'Loading…';
-        } else {
-            foreach ($this->meters as $meter) {
-                $detail = $this->detail($meter);
-                $lines[] = str_pad($meter->kind->label(), 10) . ' ' . Format::bar($meter->percent) . '  ' . Format::percent($meter->percent) . '%' . ($detail !== '' ? " · {$detail}" : '');
-            }
-        }
-
-        if ($this->lastFetchedAt > 0) {
-            $lines[] = $this->updatedAt();
-        }
-
-        return $lines;
+        return new UsageReport([new UsageGroup(array_map(fn (UsageMeter $meter): Meter => new Meter(
+            $meter->kind->label(),
+            (100 - $meter->percent) / 100,
+            $meter->resetsAt === null ? null : new DateTimeImmutable($meter->resetsAt),
+            $meter->kind->short(),
+            $this->monthEta($meter),
+        ), $this->meters))]);
     }
 
     /** `/opencode-go [subcommand]`. */
@@ -264,8 +226,7 @@ final class Tracker
             '--cookie' => $this->saveOne($screen, 'authCookie', implode(' ', $rest), 'Usage: /opencode-go --cookie <console-cookie>', static fn (): string => 'Cookie saved'),
             '--api-key' => $this->saveOne($screen, 'apiKey', implode(' ', $rest), 'Usage: /opencode-go --api-key <key>', static fn (): string => 'API key saved'),
             '--disconnect' => $this->disconnect($screen),
-            '--compact' => $this->toggle($screen, 'compact', $rest[0] ?? null),
-            '--estimate' => $this->toggle($screen, 'showEstimate', $rest[0] ?? null),
+            '--estimate' => $this->estimate($screen, $rest[0] ?? null),
             '--json' => $this->writeJson($screen),
             default => $this->show($screen),
         };
@@ -319,8 +280,6 @@ final class Tracker
         $this->save();
         $this->meters = [];
         $this->lastError = null;
-        $screen->status(self::KEY, $this->statusText());
-        $screen->widget(self::KEY, null);
 
         if ($warning !== null) {
             $screen->notify($warning, 'warning');
@@ -329,24 +288,16 @@ final class Tracker
         $screen->notify('Disconnected');
     }
 
-    private function toggle(Screen $screen, string $field, ?string $arg): void
+    private function estimate(Screen $screen, ?string $arg): void
     {
-        if ($field === 'compact') {
-            $this->config->compact = $arg !== null ? $arg !== 'off' && $arg !== 'false' : $this->config->compact !== true;
-            $said = 'Compact mode ' . ($this->config->compact ? 'on' : 'off');
-        } else {
-            $this->config->showEstimate = $arg !== null ? !($arg === 'off' || $arg === 'false') : $this->config->showEstimate === false;
-            $said = 'Usage estimate ' . ($this->config->showEstimate === false ? 'off' : 'on');
-        }
-
+        $this->config->showEstimate = $arg !== null ? !($arg === 'off' || $arg === 'false') : $this->config->showEstimate === false;
         $this->save();
-        $screen->status(self::KEY, $this->statusText());
-        $screen->notify($said);
+        $screen->notify('Usage estimate ' . ($this->config->showEstimate === false ? 'off' : 'on'));
     }
 
     private function writeJson(Screen $screen): void
     {
-        $this->refresh($screen);
+        $this->refresh();
         $path = Config::home() . '/opencode-go-usage-report.json';
         $report = [
             'workspaceId' => $this->credentials()['workspaceId'] ?? null,
@@ -363,10 +314,14 @@ final class Tracker
         }
     }
 
+    /** The report as `/usage opencode-go` draws it — the same look as every other plan. */
     private function show(Screen $screen): void
     {
-        $this->refresh($screen);
-        $screen->widget(self::KEY, $this->reportLines());
+        try {
+            $screen->notify(UsageView::text($this->report(), $screen->theme, self::TITLE));
+        } catch (RuntimeException $error) {
+            $screen->notify(self::TITLE . ': ' . $error->getMessage(), 'error');
+        }
     }
 
     /** A save replaces whatever the file held, a broken one too. */
@@ -385,12 +340,6 @@ final class Tracker
         }
     }
 
-    /** The countdown, and for the monthly meter the pace estimate after a `/`. */
-    private function detail(UsageMeter $meter): string
-    {
-        return implode(' / ', array_filter([Format::countdown($meter->resetsAt, $this->nowMs()), $this->monthEta($meter)]));
-    }
-
     /** Monthly only: quota days left at the current pace, e.g. `~18d left`. */
     private function monthEta(UsageMeter $meter): ?string
     {
@@ -401,41 +350,6 @@ final class Tracker
         $days = Format::daysLeftEstimate($meter->percent, $meter->resetsAt, $this->nowMs());
 
         return $days === null ? null : Format::formatDaysLeft($days);
-    }
-
-    /** `update 2:32 PM (Asia/Singapore)`, in the machine's time zone, as upstream's `toLocaleTimeString()` is. */
-    private function updatedAt(): string
-    {
-        $zone = new \DateTimeZone(self::localTimezone());
-        $at = (new \DateTimeImmutable('@' . (int) ($this->lastFetchedAt / 1000)))->setTimezone($zone);
-
-        return 'update ' . $at->format('g:i A') . ' (' . $zone->getName() . ')';
-    }
-
-    /**
-     * The machine's time zone: `TZ`, else the zone `/etc/localtime` links to (macOS and most Linux),
-     * else PHP's own. PHP's own alone is not it: without `date.timezone` in php.ini it is UTC, which
-     * is where the developer, in Singapore, first saw `update 9:10 PM (UTC)`.
-     */
-    public static function localTimezone(?string $tz = null, ?string $localtime = '/etc/localtime'): string
-    {
-        $known = static fn (string $name): bool => in_array($name, \DateTimeZone::listIdentifiers(), true);
-        // POSIX allows `TZ=:Asia/Singapore`.
-        $tz = ltrim($tz ?? (string) getenv('TZ'), ':');
-
-        if ($tz !== '' && $known($tz)) {
-            return $tz;
-        }
-
-        if ($localtime !== null && is_link($localtime)) {
-            $target = readlink($localtime);
-
-            if ($target !== false && preg_match('#zoneinfo/(.+)$#', $target, $match) === 1 && $known($match[1])) {
-                return $match[1];
-            }
-        }
-
-        return date_default_timezone_get();
     }
 
     private function nowMs(): float

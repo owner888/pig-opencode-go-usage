@@ -10,17 +10,15 @@ use PigOpencodeGoUsage\Tracker;
 use PigOpencodeGoUsage\UsageClient;
 use PigOpencodeGoUsage\Test\FakeTransport;
 use Pig\Async\Async;
+use Pig\CodingAgent\Usage\UsageMeter;
+use Pig\CodingAgent\Usage\UsageReport;
+use Pig\CodingAgent\Usage\UsageView;
+use RuntimeException;
 
-/** Upstream's `test/parse.test.ts`, the factory half: the status line, the report and the subcommands. */
+/** Upstream's `test/parse.test.ts`, the factory half: the credentials, the report pig draws, the subcommands. */
 final class TrackerTest extends TestCase
 {
     private string $dir;
-
-    /** @var list<array{0: string, 1: ?string}> */
-    private array $statuses = [];
-
-    /** @var list<?list<string>> */
-    private array $widgets = [];
 
     /** @var list<array{0: string, 1: string}> */
     private array $notices = [];
@@ -44,42 +42,55 @@ final class TrackerTest extends TestCase
         exec('rm -rf ' . escapeshellarg($this->dir));
     }
 
-    public function testTheMonthlyStatusGetsAPaceEstimateHideable(): void
+    public function testTheReportIsWhatIsLeftWithTheMonthlyPaceHideable(): void
     {
         putenv('OPENCODE_API_KEY=sk-test');
         $iso = static fn (float $ms): string => UsageClient::isoString(floor(microtime(true) * 1000) + $ms);
-        $tracker = $this->tracker(FakeTransport::always(200, json_encode(['usage' => [
+        $tracker = new Tracker(new UsageClient(FakeTransport::always(200, json_encode(['usage' => [
             'rolling' => ['percent' => 10, 'resetsAt' => $iso(3_600_000)],
             'weekly' => ['percent' => 20, 'resetsAt' => $iso(86_400_000)],
             'monthly' => ['percent' => 50, 'resetsAt' => $iso(15 * 86_400_000)],
-        ]], JSON_THROW_ON_ERROR)));
+        ]], JSON_THROW_ON_ERROR))));
 
-        $this->command($tracker, '');
-        // "mo 50% (15d 0h / ~15d left)" — only the monthly meter is extrapolated.
-        $this->assertMatchesRegularExpression('#mo 50% \(\d+d \d+h / ~\d+d left\)#', $this->lastStatus());
-        $this->assertDoesNotMatchRegularExpression('#wk 20% \([^)]*left#', $this->lastStatus());
-        $this->assertStringContainsString('API key: connected', implode("\n", (array) end($this->widgets)));
+        $report = Async::run(static fn (): UsageReport => $tracker->report());
+        $meters = $report->groups[0]->meters;
+        $this->assertSame(['Rolling 5h', 'Weekly', 'Monthly'], array_map(static fn (UsageMeter $m): string => $m->label, $meters));
+        $this->assertSame([0.9, 0.8, 0.5], array_map(static fn (UsageMeter $m): float => $m->remaining, $meters));
+        $this->assertSame(['5h', 'wk', 'mo'], array_map(static fn (UsageMeter $m): ?string => $m->short, $meters));
+        // Only the monthly meter is extrapolated.
+        $this->assertNull($meters[1]->detail);
+        $this->assertMatchesRegularExpression('/^~\d+d left$/', (string) $meters[2]->detail);
+        $this->assertSame('OpenCode Go: 5h 90% · wk 80% · mo 50%', UsageView::statusLine(Tracker::TITLE, $report));
 
         $this->command($tracker, '--estimate off');
-        $this->assertMatchesRegularExpression('#mo 50% \(\d+d \d+h\)#', $this->lastStatus());
-        $this->assertStringNotContainsString('left', $this->lastStatus());
         $this->assertFalse(json_decode((string) file_get_contents("{$this->dir}/opencode-go-usage.json"), true)['showEstimate']);
-
-        $this->command($tracker, '--estimate on');
-        $this->assertStringContainsString('left', $this->lastStatus());
-
-        $this->command($tracker, '--compact');
-        $this->assertSame('OpenCode Go: 5h 10% · wk 20% · mo 50%', $this->lastStatus());
+        $report = Async::run(static fn (): UsageReport => $tracker->report());
+        $this->assertNull($report->groups[0]->meters[2]->detail);
     }
 
     public function testWithoutCredentialsTheReportSaysNotConnected(): void
     {
         $tracker = $this->tracker(FakeTransport::always(500, ''));
-        $this->command($tracker, '');
 
-        $this->assertSame('OpenCode Go Usage', $this->widgets[0][0]);
-        $this->assertStringContainsString('Not connected', implode("\n", $this->widgets[0]));
-        $this->assertStringContainsString('not connected', (string) $this->statuses[0][1]);
+        $this->assertSame(Tracker::NOT_CONNECTED, Async::run(static fn (): UsageReport => $tracker->report())->note);
+        $this->command($tracker, '');
+        $this->assertStringContainsString('Not connected', $this->notices[0][0]);
+    }
+
+    public function testAFailedFetchIsThrownForPigToSay(): void
+    {
+        putenv('OPENCODE_API_KEY=sk-test');
+        $tracker = $this->tracker(FakeTransport::always(401, ''));
+
+        try {
+            Async::run(static fn (): UsageReport => $tracker->report());
+            $this->fail('A refused key was reported as usage.');
+        } catch (RuntimeException $error) {
+            $this->assertSame('Session expired — reconnect with a fresh console cookie', $error->getMessage());
+        }
+
+        $this->command($tracker, '--refresh');
+        $this->assertSame(['OpenCode Go: Session expired — reconnect with a fresh console cookie', 'error'], end($this->notices));
     }
 
     public function testPigsOwnSignInIsTheKeyWhenNothingElseIs(): void
@@ -94,7 +105,7 @@ final class TrackerTest extends TestCase
 
         $this->assertSame('sk-zen', $tracker->apiKey());
         $this->assertSame(['opencode-go', 'opencode'], $asked);
-        Async::run(fn () => $tracker->refresh($this->screen()));
+        Async::run(static fn () => $tracker->refresh());
         $this->assertSame('Bearer sk-zen', $http->requests[0]->headers['Authorization']);
 
         // A saved key comes before it, and the environment before that.
@@ -125,40 +136,25 @@ final class TrackerTest extends TestCase
 
     public function testConnectWithTwoTokensIsTheConsoleCookie(): void
     {
-        $http = FakeTransport::always(401, '');
+        $http = FakeTransport::always(200, '{"access":{"meters":{"week":{"usedMicroCents":"1","limitMicroCents":"4"}}}}');
         $tracker = $this->tracker($http);
 
         $this->command($tracker, '--connect wrk_01 Fe26.2**opaque');
 
         $this->assertSame('wrk_01', $http->requests[0]->headers['x-org-id']);
-        $this->assertSame('OpenCode Go: Session expired — reconnect with a fresh console cookie', $this->lastStatus());
-        $this->assertContains('Workspace: wrk_01', (array) end($this->widgets));
+        $this->assertStringContainsString('Weekly: 75% left', implode("\n", array_column($this->notices, 0)));
 
         $this->command($tracker, '--disconnect');
-        $this->assertNull(end($this->widgets));
-        $this->assertSame('OpenCode Go: not connected (/opencode-go --connect)', $this->lastStatus());
+        $this->assertSame(Tracker::NOT_CONNECTED, Async::run(static fn (): UsageReport => $tracker->report())->note);
     }
 
     public function testASavedFileThatIsNotJsonIsSaid(): void
     {
         file_put_contents("{$this->dir}/opencode-go-usage.json", '{broken');
         $tracker = $this->tracker(FakeTransport::always(500, ''));
-        $tracker->loadConfig();
 
-        $this->assertStringContainsString('is not JSON', $tracker->statusText());
-    }
-
-    public function testTheTimeIsTheMachinesNotPhpsDefault(): void
-    {
-        $this->assertSame('Asia/Singapore', Tracker::localTimezone('Asia/Singapore', null));
-        $this->assertSame('Asia/Singapore', Tracker::localTimezone(':Asia/Singapore', null));
-
-        $link = "{$this->dir}/localtime";
-        symlink('/var/db/timezone/zoneinfo/Asia/Singapore', $link);
-        $this->assertSame('Asia/Singapore', Tracker::localTimezone('', $link));
-        $this->assertSame('Asia/Singapore', Tracker::localTimezone('Not/AZone', $link));
-
-        $this->assertSame(date_default_timezone_get(), Tracker::localTimezone('', null));
+        $this->expectExceptionMessage('is not JSON');
+        $tracker->report();
     }
 
     private function tracker(FakeTransport $http): Tracker
@@ -171,27 +167,9 @@ final class TrackerTest extends TestCase
 
     private function command(Tracker $tracker, string $args): void
     {
-        Async::run(fn () => $tracker->command($args, $this->screen()));
-    }
-
-    private function screen(): Screen
-    {
-        return new Screen(
-            function (string $key, ?string $text): void {
-                $this->statuses[] = [$key, $text];
-            },
-            function (string $key, ?array $lines): void {
-                $this->widgets[] = $lines;
-            },
-            function (string $message, string $level): void {
-                $this->notices[] = [$message, $level];
-            },
-        );
-    }
-
-    private function lastStatus(): string
-    {
-        return (string) end($this->statuses)[1];
+        Async::run(fn () => $tracker->command($args, new Screen(function (string $message, string $level): void {
+            $this->notices[] = [$message, $level];
+        })));
     }
 
     private function warned(string $needle): bool

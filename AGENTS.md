@@ -8,7 +8,7 @@ does; this says how it is worked on. Keep this file under 100 lines.
 
 - **Upstream is `extensions/opencode-go-usage.ts`, one file, split here by what it does.**
   `UsageClient` is `parseGoStatus()`, `fetchUsageApiKey()` and the cookie half of `fetchUsage()`;
-  `Format` is `bar()`, `countdown()`, `daysLeftEstimate()` and `formatDaysLeft()`; `FetchFailure` is
+  `Format` is `daysLeftEstimate()` and `formatDaysLeft()`; `FetchFailure` is
   the `FetchFailure` union and `describeFailure()`; `SavedConfig` is `Config` with `loadConfig()` /
   `saveConfig()`; `Tracker` is the body of the default-export factory; `MeterKind` and `UsageMeter`
   are its types. `test/parse.test.ts` is `tests/Unit/{UsageClient,Format,Tracker}Test.php`. A
@@ -17,19 +17,20 @@ does; this says how it is worked on. Keep this file under 100 lines.
 - **When pi-opencode-go-usage releases**: read the diff since the release this port is in step
   with (named in `CHANGELOG.md`), port it, and move that name. The package's version follows
   upstream's.
-- Strings the person reads (status line, report, notifications) are upstream's, word for word,
+- Strings the person reads (notifications, failure messages) are upstream's, word for word,
   except where a comment says otherwise.
 
 ## Where this is pig's on purpose
 
 - **Keys**: after upstream's three variables and the saved key, pig's own sign-in for
   `opencode-go`, then `opencode` (`Tracker::apiKey()`).
+- **pig draws it** (`registerUsage()`, `Tracker::report()`): the footer line, `/usage`, the web
+  Usage panel and `/opencode-go`'s report are pig's `UsageView`, every bar what is *left*. Upstream's
+  own status line, report widget, five-minute timer, `bar()`, `countdown()` and `--compact` are
+  therefore not ported. Needs a pig with `registerUsage()`.
 - **Files**: `~/.pig/agent/opencode-go-usage.json` (`0600`) and `opencode-go-usage-report.json`;
   `OPENCODE_GO_CONFIG_PATH` still overrides the first. A saved file that cannot be read or is not
-  JSON is said on the status line, not read as empty.
-- **The timer runs in the terminal only** (`mode() === 'tui'`), and a refresh that throws is logged.
-- **The web panel** (`UsagePanel`) is pig's own: the page draws no status line. Its meters are
-  what is left, as the page draws every quota; the text says what is used.
+  JSON is an error where the usage would be, not read as empty.
 - **Requests** go through `Pig\Ai\Http\Retrying::fetch()` with `send()`, never `follow()`: a
   redirect is judged, as upstream's `redirect: "manual"` is.
 - **User-Agent**: the API-key request sends `PigUserAgent::get()`, as pig's model requests to

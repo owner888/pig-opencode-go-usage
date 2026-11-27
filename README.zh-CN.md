@@ -1,22 +1,21 @@
 # pig-opencode-go-usage
 
-给 [pig](https://github.com/owner888/pig) 编程智能体用的 OpenCode Go 用量显示：**5 小时滚动、每周、每月**三个限额，显示在状态栏、`/opencode-go` 报告里，以及 `pig web` 的面板中。它是 [pi-opencode-go-usage](https://github.com/Dakai/pi-opencode-go-usage) 的 PHP 移植，跟随其版本同步（当前 1.1.3）。
+给 [pig](https://github.com/owner888/pig) 编程智能体用的 OpenCode Go 用量显示：**5 小时滚动、每周、每月**三个限额，显示在 pig 的底部状态栏、`/usage` 和 `pig web` 的「用量」面板里。由 pig 自己绘制（`registerUsage()`），和其他套餐的用量长得一样。它是 [pi-opencode-go-usage](https://github.com/Dakai/pi-opencode-go-usage) 的 PHP 移植，跟随其版本同步（当前 1.1.3）。
 
 [English](README.md)
 
 ```
-状态栏：  OpenCode Go: 5h 62% (1h 12m) · wk 31% (3d 4h) · mo 44% (12d 0h / ~15d left) · update 2:32 PM (Asia/Singapore)
+状态栏：  OpenCode Go: 5h 38% · wk 69% · mo 56%
 
-/opencode-go：
-  OpenCode Go Usage
-  API key: connected
-  Rolling 5h ██████░░░░  62% · 1h 12m
-  Weekly     ███░░░░░░░  31% · 3d 4h
-  Monthly    ████░░░░░░  44% · 12d 0h / ~15d left
-  update 2:32 PM (Asia/Singapore)
+/usage opencode-go：
+  OpenCode Go
+
+    [████████------------] Rolling 5h: 38% left · resets 1h 12m
+    [██████████████------] Weekly: 69% left · resets 3d 4h
+    [███████████---------] Monthly: 56% left · resets 12d 0h · ~15d left
 ```
 
-月度倒计时后面是估算：按目前的用量速度，额度大约还够用 15 天。
+每根条显示的是剩余额度，颜色也按剩余多少来定。月度那行最后是估算：按目前的用量速度，额度大约还够用 15 天。
 
 ## 安装
 
@@ -24,7 +23,7 @@
 pig install git:github.com/owner888/pig-opencode-go-usage
 ```
 
-没有 Composer 依赖。
+没有 Composer 依赖。需要带 `registerUsage()` 的 pig（2.0.40 之后的版本）。
 
 ## 连接
 
@@ -55,7 +54,7 @@ pig install git:github.com/owner888/pig-opencode-go-usage
 
 | 命令 | 作用 |
 | --- | --- |
-| `/opencode-go` | 获取并显示报告 |
+| `/opencode-go` | 获取并显示报告（等同于 `/usage opencode-go`） |
 | `/opencode-go --connect <api-key>` | 保存 API key，获取并显示 |
 | `/opencode-go --api-key <api-key>` | 只保存 API key |
 | `/opencode-go --connect <wrk> <cookie>` | 保存 workspace 和 cookie，获取并显示 |
@@ -63,15 +62,14 @@ pig install git:github.com/owner888/pig-opencode-go-usage
 | `/opencode-go --cookie <值>` | 只保存 cookie |
 | `/opencode-go --disconnect` | 清除保存的凭据 |
 | `/opencode-go --refresh` | 立即重新获取 |
-| `/opencode-go --compact [on\|off]` | 精简状态栏（`5h 0% · wk 2% · mo 2%`） |
 | `/opencode-go --estimate [on\|off]` | 显示或隐藏月度剩余天数估算 |
 | `/opencode-go --json` | 把报告写到 `~/.pig/agent/opencode-go-usage-report.json` |
 
-终端里状态栏每 5 分钟刷新一次。`pig web` 里，OpenCode Go 面板在页面顶部的 ⋯ 菜单中，输入 `/opencode-go` 也会打开它；打开时获取。
+终端里 pig 每 5 分钟刷新一次状态栏。`pig web` 里，「用量」面板在页面顶部的 ⋯ 菜单中，输入 `/usage` 也会打开它；打开时获取。
 
 ## 出错时
 
-| 状态文字 | 含义 | 处理 |
+| 提示 | 含义 | 处理 |
 | --- | --- | --- |
 | `Session expired` | key 或控制台会话被拒绝 | 换新的 key 或 cookie 重新连接 |
 | `No Go subscription on this workspace` | 控制台显示该 workspace 没有 Go 套餐 | 检查 workspace |

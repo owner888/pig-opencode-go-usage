@@ -4,45 +4,13 @@ declare(strict_types=1);
 
 namespace PigOpencodeGoUsage;
 
-/** Upstream's `bar()`, `countdown()`, `daysLeftEstimate()` and `formatDaysLeft()`. */
+/**
+ * Upstream's `daysLeftEstimate()` and `formatDaysLeft()`, the monthly pace estimate. Its `bar()` and
+ * `countdown()` are not ported: pig draws the bars and the resets (`UsageView`).
+ */
 final class Format
 {
     private const int DAY_MS = 86_400_000;
-
-    public static function bar(float $percent, int $width = 10): string
-    {
-        $clamped = min(100.0, max(0.0, $percent));
-        $filled = (int) round($clamped / 100 * $width);
-
-        return str_repeat('█', $filled) . str_repeat('░', $width - $filled);
-    }
-
-    /** `20m`, `1h 12m`, `3d 4h`, `resets now`; null without a reset. */
-    public static function countdown(?string $resetsAt, ?float $nowMs = null): ?string
-    {
-        $target = UsageClient::parseMs($resetsAt);
-
-        if ($target === null) {
-            return null;
-        }
-
-        $ms = $target - ($nowMs ?? self::nowMs());
-
-        if ($ms <= 0) {
-            return 'resets now';
-        }
-
-        $totalMinutes = (int) floor($ms / 60_000);
-        $days = intdiv($totalMinutes, 60 * 24);
-        $hours = intdiv($totalMinutes % (60 * 24), 60);
-        $minutes = $totalMinutes % 60;
-
-        if ($days > 0) {
-            return "{$days}d {$hours}h";
-        }
-
-        return $hours > 0 ? "{$hours}h {$minutes}m" : "{$minutes}m";
-    }
 
     /**
      * Days the monthly quota will last at the pace so far. The period covers one calendar month
@@ -93,12 +61,6 @@ final class Format
         }
 
         return $days < 1 ? '<1d left' : '~' . (int) round($days) . 'd left';
-    }
-
-    /** A percentage as JavaScript prints a number: `62`, `62.5`. */
-    public static function percent(float $percent): string
-    {
-        return (string) (floor($percent) === $percent ? (int) $percent : $percent);
     }
 
     public static function nowMs(): float

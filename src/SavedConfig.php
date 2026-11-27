@@ -22,7 +22,6 @@ final class SavedConfig
         public ?string $workspaceId = null,
         public ?string $authCookie = null,
         public ?string $apiKey = null,
-        public ?bool $compact = null,
         /** The monthly pace estimate after the reset countdown; shown unless false. */
         public ?bool $showEstimate = null,
     ) {
@@ -59,7 +58,7 @@ final class SavedConfig
         $string = static fn (string $key): ?string => is_string($data[$key] ?? null) ? $data[$key] : null;
         $bool = static fn (string $key): ?bool => is_bool($data[$key] ?? null) ? $data[$key] : null;
 
-        return new self($string('workspaceId'), $string('authCookie'), $string('apiKey'), $bool('compact'), $bool('showEstimate'));
+        return new self($string('workspaceId'), $string('authCookie'), $string('apiKey'), $bool('showEstimate'));
     }
 
     public function save(): void
@@ -69,7 +68,6 @@ final class SavedConfig
             'workspaceId' => $this->workspaceId,
             'authCookie' => $this->authCookie,
             'apiKey' => $this->apiKey,
-            'compact' => $this->compact,
             'showEstimate' => $this->showEstimate,
         ], static fn (mixed $value): bool => $value !== null);
 

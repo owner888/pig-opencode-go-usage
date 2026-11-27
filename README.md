@@ -1,22 +1,21 @@
 # pig-opencode-go-usage
 
-OpenCode Go usage for the [pig](https://github.com/owner888/pig) coding agent: the **rolling 5-hour, weekly and monthly** limits on the status line, in a `/opencode-go` report, and in a panel in `pig web`. A PHP port of [pi-opencode-go-usage](https://github.com/Dakai/pi-opencode-go-usage), in step with its 1.1.3.
+OpenCode Go usage for the [pig](https://github.com/owner888/pig) coding agent: the **rolling 5-hour, weekly and monthly** limits in pig's footer, in `/usage` and in the Usage panel of `pig web` — drawn by pig itself (`registerUsage()`), so they look like every other plan's. A PHP port of [pi-opencode-go-usage](https://github.com/Dakai/pi-opencode-go-usage), in step with its 1.1.3.
 
 [简体中文](README.zh-CN.md)
 
 ```
-Status line:  OpenCode Go: 5h 62% (1h 12m) · wk 31% (3d 4h) · mo 44% (12d 0h / ~15d left) · update 2:32 PM (Asia/Singapore)
+Footer:  OpenCode Go: 5h 38% · wk 69% · mo 56%
 
-/opencode-go:
-  OpenCode Go Usage
-  API key: connected
-  Rolling 5h ██████░░░░  62% · 1h 12m
-  Weekly     ███░░░░░░░  31% · 3d 4h
-  Monthly    ████░░░░░░  44% · 12d 0h / ~15d left
-  update 2:32 PM (Asia/Singapore)
+/usage opencode-go:
+  OpenCode Go
+
+    [████████------------] Rolling 5h: 38% left · resets 1h 12m
+    [██████████████------] Weekly: 69% left · resets 3d 4h
+    [███████████---------] Monthly: 56% left · resets 12d 0h · ~15d left
 ```
 
-The monthly countdown is followed by an estimate: at the pace so far, the quota lasts about 15 more days.
+Every bar is what is left, coloured by it. The monthly line ends with an estimate: at the pace so far, the quota lasts about 15 more days.
 
 ## Install
 
@@ -24,7 +23,7 @@ The monthly countdown is followed by an estimate: at the pace so far, the quota 
 pig install git:github.com/owner888/pig-opencode-go-usage
 ```
 
-No Composer dependencies.
+No Composer dependencies. Needs a pig with `registerUsage()` (the release after 2.0.40).
 
 ## Connect
 
@@ -55,7 +54,7 @@ Environment variables win over what is saved; `/opencode-go` warns when one shad
 
 | Command | Effect |
 | --- | --- |
-| `/opencode-go` | Fetch and show the report |
+| `/opencode-go` | Fetch and show the report (the same as `/usage opencode-go`) |
 | `/opencode-go --connect <api-key>` | Save the API key, fetch, show |
 | `/opencode-go --api-key <api-key>` | Save the API key only |
 | `/opencode-go --connect <wrk> <cookie>` | Save workspace and cookie, fetch, show |
@@ -63,15 +62,14 @@ Environment variables win over what is saved; `/opencode-go` warns when one shad
 | `/opencode-go --cookie <value>` | Save the cookie only |
 | `/opencode-go --disconnect` | Forget what was saved |
 | `/opencode-go --refresh` | Fetch again now |
-| `/opencode-go --compact [on\|off]` | Shorter status line (`5h 0% · wk 2% · mo 2%`) |
 | `/opencode-go --estimate [on\|off]` | Show or hide the monthly days-left estimate |
 | `/opencode-go --json` | Write the report to `~/.pig/agent/opencode-go-usage-report.json` |
 
-In the terminal the status line refreshes every five minutes. In `pig web`, the OpenCode Go panel is in the header's ⋯ menu, and `/opencode-go` opens it; it fetches when opened.
+In the terminal pig refreshes the footer line every five minutes. In `pig web`, the Usage panel is in the header's ⋯ menu, and `/usage` opens it; it fetches when opened.
 
 ## When it fails
 
-| Status text | Meaning | Fix |
+| Message | Meaning | Fix |
 | --- | --- | --- |
 | `Session expired` | The key or console session was refused | Reconnect with a fresh key or cookie |
 | `No Go subscription on this workspace` | The console reports no Go plan | Check the workspace |

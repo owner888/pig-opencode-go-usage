@@ -8,30 +8,10 @@ use PHPUnit\Framework\TestCase;
 use PigOpencodeGoUsage\Format;
 use PigOpencodeGoUsage\UsageClient;
 
-/** Upstream's `test/parse.test.ts`, the formatting half. */
+/** Upstream's `test/parse.test.ts`, the pace estimate. */
 final class FormatTest extends TestCase
 {
     private const float DAY = 86_400_000;
-
-    public function testCountdown(): void
-    {
-        $now = (float) UsageClient::parseMs('2026-08-16T00:00:00Z');
-        $at = static fn (float $ms): string => UsageClient::isoString($now + $ms);
-
-        $this->assertSame('20m', Format::countdown($at(1_200_000), $now));
-        $this->assertSame('1h 12m', Format::countdown($at(4_320_000), $now));
-        $this->assertSame('3d 4h', Format::countdown($at(273_600_000), $now));
-        $this->assertSame('resets now', Format::countdown($at(-1), $now));
-        $this->assertNull(Format::countdown(null, $now));
-    }
-
-    public function testBar(): void
-    {
-        $this->assertSame('██████░░░░', Format::bar(62, 10));
-        $this->assertSame('░░░░░░░░░░', Format::bar(0, 10));
-        $this->assertSame('██████████', Format::bar(100, 10));
-        $this->assertSame('██████████', Format::bar(150, 10));
-    }
 
     public function testDaysLeftEstimateExtrapolatesTheMonthlyPace(): void
     {
@@ -60,12 +40,5 @@ final class FormatTest extends TestCase
         $this->assertSame('~18d left', Format::formatDaysLeft(18.4));
         $this->assertSame('<1d left', Format::formatDaysLeft(0.4));
         $this->assertSame('quota used up', Format::formatDaysLeft(0));
-    }
-
-    public function testAPercentagePrintsAsJavaScriptPrintsIt(): void
-    {
-        $this->assertSame('62', Format::percent(62.0));
-        $this->assertSame('62.5', Format::percent(62.5));
-        $this->assertSame('0', Format::percent(0.0));
     }
 }

@@ -8,12 +8,8 @@ port is in step with.
 
 ### Changed
 
+- pig draws the usage now (`registerUsage()`, pig's new usage API): the footer line, `/usage` and the Usage panel in `pig web` are pig's, in the look every plan shares — each bar is what is *left*, coloured by it — and `/opencode-go` shows the same report. The package's own status line, report widget, timer and web panel are gone, and so is `--compact`, which the footer's line already is. Needs a pig with `registerUsage()`.
 - The usage request made with an API key says it is pig (`pig/<version> (…)`), the `User-Agent` pig's model requests to OpenCode carry, instead of upstream's Chrome one, so one key does not show up as two clients. The console-cookie request still sends the browser's, since it uses the browser's session.
-
-### Fixed
-
-- The "update" time is in the machine's time zone (`TZ`, else the zone `/etc/localtime` names), as upstream's is; it was PHP's default, which is UTC on a PHP with no `date.timezone`.
-- The status line is drawn in the theme's `dim`, as the footer's own lines are, instead of as the one bright line there. In the terminal only; an RPC host still gets it plain.
 
 ## [1.1.3] - 2026-11-26
 
